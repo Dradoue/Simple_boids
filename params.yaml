@@ -1,0 +1,28 @@
+---
+# parametres de la fenetre
+
+x_limit : 2000 # largeur
+y_limit : 2000 # hauteur
+
+---
+# fichier pour parametrer les boids
+
+max_vel_norm : 35
+min_val_norm : 5
+indiv : [120, 120, 120, 120] # les individus
+relations: # matrice n * n avec une ligne qui représente chaque boid
+  - [0, 1, 1, -1]
+  - [-1, 0, -1, -1]
+  - [-1, 1, 0, 1]
+  - [-1, -1, -1, 0]
+attraction_distance : [70000, 70000, 70000, 70000] #les distances de detection et les coefficients de force pour chaque mouvement
+alert_distance : [3000, 3000, 3000, 3000]
+formation_flying_distance : [80000, 80000, 80000, 80000]
+move_to_middle_strength : [0.023, 0.023, 0.023, 0.023]
+separation_strength : [0.02, 0.02, 0.02, 0.02]
+formation_flying_strength : [0.023, 0.023, 0.023, 0.023]
+chase_distance : [70000, 70000, 70000, 70000]
+chase_strength : [0.023, 0.023, 0.023, 0.023]
+flee_strength : [0.023, 0.023, 0.023, 0.023]
+flee_distance : [70000, 70000, 70000, 70000]
+colors : ['r', 'g', 'b', 'c', 'k', 'm', 'y', 'w'] # couleurs des boids

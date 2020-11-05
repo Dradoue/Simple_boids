@@ -8,19 +8,9 @@ import numpy as np
 from matplotlib import animation
 from matplotlib import pyplot as plt
 
+import constants
 
-def cart2pol(x, y):
-    rho = np.sqrt(x ** 2 + y ** 2)
-    phi = np.arctan2(y, x)
-
-    return rho, phi
-
-
-def pol2cart(rho, phi):
-    x = rho * np.cos(phi)
-    y = rho * np.sin(phi)
-
-    return x, y
+from utils import cart2pol, pol2cart
 
 
 def animate(frame):
@@ -33,23 +23,16 @@ def animate(frame):
 
 def init_positions(lower_limits, upper_limits):
     """
-    :param lower_limits:
-    :param upper_limits:
-    :return: array with positions initialised
+    return array with positions initialised
     """
     width = upper_limits - lower_limits
 
-    return lower_limits[:, np.newaxis] + np.random.rand(2, BOIDS_COUNT) * width[:, np.newaxis]
+    return lower_limits[:, np.newaxis] + np.random.rand(2, constants.BOIDS_COUNT) * width[:, np.newaxis]
 
 
 def calculate_centers(list_ind_1, list_ind_2, square_distances, distance):
     """
     Calculate the centers of list_ind_1 with neighborhood list_ind_2 and distance
-    :param list_ind_1:
-    :param list_ind_2:
-    :param square_distances:
-    :param distance:
-    :return: centers
     """
     global positions
 
@@ -78,28 +61,29 @@ def calculate_centers(list_ind_1, list_ind_2, square_distances, distance):
 def get_ind(species):
     """
     Get the list of indices for one species.
-    :param species: int from 0 to n_species
-    :return: list of indices
     """
-    assert 0 <= species <= RELATIONS.shape[0], 'this species doesnt exist'
+    assert 0 <= species <= constants.RELATIONS.shape[0], 'this species doesnt exist'
 
-    list_indices = list()
     # particular cases:
     # if there is only one species or it is first species
     if species == 0:
-        return list(np.arange(0, IND[0]))
+        return list(np.arange(0, constants.IND[0]))
     # other species
     else:
-        return list(np.arange(np.sum(IND[:species]), np.sum(IND[:species]) + IND[species]))
+        return list(
+            np.arange(np.sum(constants.IND[:species]), np.sum(constants.IND[:species]) + constants.IND[species]))
 
 
 def cohesion_separation_alignment(species, square_distances, velocity_differences):
+    """
+    Apply cohesion-separation-alignment for a species
+    """
     global velocities
 
     ind_species = get_ind(species)
     # cohesion:
 
-    middle = calculate_centers(ind_species, ind_species, square_distances, ATTRACTION_DISTANCE)
+    middle = calculate_centers(ind_species, ind_species, square_distances, constants.ATTRACTION_DISTANCE[species])
     # we get a n_i*2 Matrix with middles
 
     has_neighbors = np.where(middle[:, 0] != 0, 1, 0)
@@ -108,22 +92,22 @@ def cohesion_separation_alignment(species, square_distances, velocity_difference
     # For boids that have neighbors near, we apply cohesion
     direction_to_middle = (middle.T - positions[:, ind_species]) * has_neighbors
 
-    velocities[:, ind_species] += direction_to_middle * MOVE_TO_MIDDLE_STRENGTH
+    velocities[:, ind_species] += direction_to_middle * constants.MOVE_TO_MIDDLE_STRENGTH[species]
 
     # separation
-    middle = calculate_centers(ind_species, ind_species, square_distances, ALERT_DISTANCE)
+    middle = calculate_centers(ind_species, ind_species, square_distances, constants.ALERT_DISTANCE[species])
 
     has_neighbors = np.where(middle[:, 0] != 0, 1, 0)
     has_neighbors = has_neighbors[np.newaxis, :]
 
     direction_to_middle = (middle.T - positions[:, ind_species]) * has_neighbors
-    velocities[:, ind_species] -= direction_to_middle * SEPARATION_STRENGTH
+    velocities[:, ind_species] -= direction_to_middle * constants.SEPARATION_STRENGTH[species]
 
     # alignment
     dist = square_distances[ind_species, :]
     dist = dist[:, ind_species]
 
-    very_far = dist > FORMATION_FLYING_DISTANCE
+    very_far = dist > constants.FORMATION_FLYING_DISTANCE[species]
     # N * N matrix with True if the neighbor is away False else
 
     velocity_differences_if_close = np.copy(velocity_differences[:, :, ind_species])
@@ -134,10 +118,14 @@ def cohesion_separation_alignment(species, square_distances, velocity_difference
     velocity_differences_if_close[1, :, :][very_far] = 0
 
     # (2,n_i)              (2, n_i)
-    velocities[:, ind_species] -= np.mean(velocity_differences_if_close, 1) * FORMATION_FLYING_STRENGTH
+    velocities[:, ind_species] -= np.mean(velocity_differences_if_close, 1) \
+                                  * constants.FORMATION_FLYING_STRENGTH[species]
 
 
 def update_boids():
+    """
+    Update the boids each frame
+    """
     global positions, velocities
 
     # 2*N*N separation matrix
@@ -149,12 +137,12 @@ def update_boids():
 
     velocity_differences = velocities[:, np.newaxis, :] - velocities[:, :, np.newaxis]
 
-    for i in range(RELATIONS.shape[0]):
+    for i in range(constants.RELATIONS.shape[0]):
         # for species n°i, we apply cohesion, separation, alignment
         ind_i = get_ind(i)
         cohesion_separation_alignment(i, square_distances, velocity_differences)
-        flee = np.where(RELATIONS[i, :] == -1)[0]
-        chase = np.where(RELATIONS[i, :] == 1)[0]
+        flee = np.where(constants.RELATIONS[i, :] == -1)[0]
+        chase = np.where(constants.RELATIONS[i, :] == 1)[0]
         ind_flee = []
         ind_chase = []
         for ind in flee:
@@ -163,15 +151,20 @@ def update_boids():
             ind_chase += get_ind(ind)
 
         # ATTRACTION_DISTANCE to replace here (temporary) by a new parameter
-        chase_boids(ind_i, ind_flee, square_distances, ATTRACTION_DISTANCE, chase=False)
-        chase_boids(ind_i, ind_chase, square_distances, ATTRACTION_DISTANCE, chase=True)
+        chase_boids(ind_i, ind_flee, square_distances, constants.FLEE_DISTANCE[i], constants.FLEE_STRENGTH[i],
+                    chase=False)
+        chase_boids(ind_i, ind_chase, square_distances, constants.CHASE_DISTANCE[i], constants.CHASE_STRENGTH[i],
+                    chase=True)
 
     limit_vel()
     positions = positions + velocities
     wrap()
 
 
-def chase_boids(ind_chase, ind_prey, square_distances, distance, chase=True):
+def chase_boids(ind_chase, ind_prey, square_distances, distance, strength, chase):
+    """
+    boids ind_chase chase or flee boids from ind_prey
+    """
     global velocities
     middle = calculate_centers(ind_chase, ind_prey, square_distances, distance)
     # we get a n_i*2 Matrix with middles
@@ -183,94 +176,51 @@ def chase_boids(ind_chase, ind_prey, square_distances, distance, chase=True):
     direction_to_middle = (middle.T - positions[:, ind_chase]) * has_neighbors
 
     if chase:
-        velocities[:, ind_chase] += direction_to_middle * MOVE_TO_MIDDLE_STRENGTH
+        velocities[:, ind_chase] += direction_to_middle * strength
     else:
-        velocities[:, ind_chase] -= direction_to_middle * MOVE_TO_MIDDLE_STRENGTH
+        velocities[:, ind_chase] -= direction_to_middle * strength
 
 
 def limit_vel():  # cart2pol and pol2cart cost a lot, to optimize
+    """
+    Limit the velocity
+    """
     global velocities
 
     rho, phy = cart2pol(velocities[0, :], velocities[1, :])
 
-    rho = np.where(rho > MAX_FORCE, MAX_FORCE, rho)
-    rho = np.where(rho < MIN_FORCE, MIN_FORCE, rho)
+    rho = np.where(rho > constants.MAX_FORCE, constants.MAX_FORCE, rho)
+    rho = np.where(rho < constants.MIN_FORCE, constants.MIN_FORCE, rho)
 
     velocities[0, :], velocities[1, :] = pol2cart(rho, phy)
 
 
 def wrap():
+    """
+    Make sure that the boids stay into the simulation
+    """
     global positions
     # we update the x positions to stay in the simulation
-    pos_x = np.where(positions[0, :] < 0, positions[0, :] + X_LIMIT, positions[0, :])
-    pos_x = np.where(pos_x > X_LIMIT, pos_x - X_LIMIT, pos_x)
+    pos_x = np.where(positions[0, :] < 0, positions[0, :] + constants.X_LIMIT, positions[0, :])
+    pos_x = np.where(pos_x > constants.X_LIMIT, pos_x - constants.X_LIMIT, pos_x)
     pos_x = pos_x[np.newaxis, :]
 
     # we update the y positions to stay in the simulation
-    pos_y = np.where(positions[1, :] < 0, positions[1, :] + Y_LIMIT, positions[1, :])
-    pos_y = np.where(pos_y > Y_LIMIT, pos_y - Y_LIMIT, pos_y)
+    pos_y = np.where(positions[1, :] < 0, positions[1, :] + constants.Y_LIMIT, positions[1, :])
+    pos_y = np.where(pos_y > constants.Y_LIMIT, pos_y - constants.Y_LIMIT, pos_y)
     pos_y = pos_y[np.newaxis, :]
 
     positions = np.concatenate((pos_x, pos_y), axis=0)
 
 
-# Boids parameters
-# cohesion
-ATTRACTION_DISTANCE = 70000  # 70000
-MOVE_TO_MIDDLE_STRENGTH = 0.025  # 0.03
-
-# separation
-ALERT_DISTANCE = 3000  # 3000
-SEPARATION_STRENGTH = 0.02
-
-# alignment
-FORMATION_FLYING_DISTANCE = 80000  # 80000
-FORMATION_FLYING_STRENGTH = 0.023
-
-# force
-MAX_FORCE = 30
-MIN_FORCE = 12
-
-# Window size
-X_LIMIT = 2000
-Y_LIMIT = 2000
-
-# relations between boids
-RELATIONS = np.array([
-    [0, 1, 1, -1],
-    [-1, 0, -1, -1],
-    [-1, 1, 0, 1],
-    [-1, -1, -1, 0]
-])
-
-# number of boids for each species
-N1 = 120
-N2 = 120
-N3 = 120
-N4 = 120
-
-IND = [N1, N2, N3, N4]
-
-BOIDS_COUNT = np.sum(IND)
-
-# colors
-colors = ['r', 'g', 'b', 'c']  # , 'k'
-
-list_colors = colors[0] * N1 + colors[1] * N2 + colors[2] * N3 + colors[3] * N4  
-
-limits = np.array([X_LIMIT, Y_LIMIT])
-
 # initial positions and velocities
-
-positions = init_positions(np.array([10, 10]), np.array([1990, 1990]))
-
-velocities = init_positions(np.array([5, -20]), np.array([12, 20]))
+positions = init_positions(np.array([10, 10]), np.array([constants.X_LIMIT - 10, constants.Y_LIMIT - 10]))
+velocities = init_positions(np.array([5, -50]), np.array([12, 50]))
 
 # animation
-
-figure = plt.figure(figsize=[30, 30])
-axes = plt.axes(xlim=(0, limits[0]), ylim=(0, limits[1]))
-scatter = axes.scatter(positions[0, :], positions[1, :], c=list_colors,
+figure = plt.figure(figsize=[35, 35])
+axes = plt.axes(xlim=(0, constants.LIMITS[0]), ylim=(0, constants.LIMITS[1]))
+scatter = axes.scatter(positions[0, :], positions[1, :], c=constants.LIST_COLOR,
                        marker='o', lw=0.5)
 
 anim = animation.FuncAnimation(figure, animate, frames=200, interval=30)
