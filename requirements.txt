@@ -2,7 +2,7 @@
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
 matplotlib=3.0.3=pypi_0
-numpy=1.18.5=pypi_0
+numpy>=1.22
 numpy-base=1.15.2=py35h81de0dd_0
 python=3.5.6=hc3d631a_0
 pyyaml>=5.4
